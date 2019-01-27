@@ -1,4 +1,7 @@
 # CoPilot
+
+A fork of [Joelzeller's](https://github.com/Joelzeller) [CoPilot](https://github.com/Joelzeller/CoPilot) project in order to merge it with features of [Iván Gómez Alonso's fork of](https://github.com/igomezal) [OpenAuto](https://github.com/igomezal/openauto).
+
 Raspberry Pi powered in-car infotainment system
 
 Check out my website for more info: http://joelzeller.wixsite.com/copilot
