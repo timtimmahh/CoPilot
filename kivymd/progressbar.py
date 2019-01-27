@@ -81,7 +81,7 @@ Builder.load_string('''
 
         Color:
             #rgba: ((1, 0, 0, 1) if app.obdRPMval > app.obdRPMredline else self.theme_cls.primary_color)
-            rgba: ((0, 0, 1, 1) if app.obdcoolanttempval < 190 else ((1, 0, 0, 1) if app.obdcoolanttempval > 220 else (0, 1, 0, 1))) #green normally, red if overheating, blue if cold
+            #rgba: ((0, 0, 1, 1) if app.obdcoolanttempval < 190 else ((1, 0, 0, 1) if app.obdcoolanttempval > 220 else (0, 1, 0, 1))) #green normally, red if overheating, blue if cold
         Rectangle:
             size:     (self.width*self.value_normalized, sp(30)) if self.orientation == 'horizontal' else (sp(30), \
                 self.height*self.value_normalized)

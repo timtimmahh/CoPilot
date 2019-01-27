@@ -1,0 +1,27 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+cython = "==0.28.5"
+kivy-garden = "*"
+kivymd = {editable = true,git = "https://github.com/HeaTTheatR/KivyMD.git"}
+kivy = {editable = true,git = "https://github.com/kivy/kivy.git",ref = "1.10.1"}
+numpy = "*"
+plyer = {editable = true,git = "https://github.com/kivy/plyer.git",ref = "1.4.0"}
+pygments = "*"
+docutils = "*"
+pint = "==0.7.2"
+"RPi.GPIO" = {editable = true,hg = "http://hg.code.sf.net/p/raspberry-gpio-python/code"}
+plumbum = "*"
+psutil = "*"
+netifaces = "*"
+
+[requires]
+python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

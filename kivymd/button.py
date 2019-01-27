@@ -492,7 +492,7 @@ class JZLargeButton(ThemableBehavior, RectangularRippleBehavior,
             self.elevation = 0
         else:
             self.elevation = self.elevation_normal
-        super(JZLargeButton, self).on_disabled(instance, value)
+        super(JZLargeButton, self).set_disabled(value)
 
     def on_touch_down(self, touch):
         if not self.disabled:

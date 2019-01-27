@@ -1,5 +1,16 @@
+import sys
+import datetime
+import time
+import subprocess
+import glob
+import math
+import pickle
+import os
+import operator
+
+import settings
+from utils import is_rpi, ip_addresses
 import kivy
-#kivy.require('1.0.6')
 from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.togglebutton import ToggleButton
@@ -11,11 +22,10 @@ from kivy.uix.switch import Switch
 from kivy.clock import Clock
 from kivy.graphics import Color, Rectangle
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Line
+from kivy.graphics import Line
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.anchorlayout import AnchorLayout
 from math import cos, sin, pi
-from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.properties import NumericProperty, StringProperty, BooleanProperty, ListProperty, ObjectProperty
 from kivy.uix.label import Label
@@ -26,11 +36,7 @@ from kivy.core.window import Window
 from kivy.uix.scatter import Scatter
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.image import AsyncImage
-from kivy.app import App
-from kivy.lang import Builder
 from kivy.metrics import dp
-from kivy.properties import ObjectProperty
-from kivy.uix.image import Image
 from kivymd.button import MDIconButton
 from kivymd.label import MDLabel
 from kivymd.list import ILeftBody, ILeftBodyTouch, IRightBodyTouch
@@ -38,82 +44,59 @@ from kivymd.theming import ThemeManager
 from kivymd.dialog import MDDialog
 import kivymd.snackbar as Snackbar
 
-import os
+try:
+    import RPi.GPIO as GPIO
 
-os.environ["KIVY_IMAGE"]="pil"
+    # import serial
+    test_environment = False
+except (ImportError, RuntimeError):
+    test_environment = True
 
-
-
-#from kivy.garden.mapview import MapView
-
-#I know global variables are the devil....but they are so easy
-
-#set to 1 to disable all GPIO, temp probe, and obd stuff
-global developermode
-developermode = 1
-global devtaps #used to keep track of taps on settings label - 5 will force devmode
-devtaps = 0
-
-
+# 10/20/2017
+#Created by Joel Zeller
+#
+#  1/25/2019
+# Modified by Timothy Logan
 
 global version
-version = "V2.3.0"
-#10/20/2017
-#Created by Joel Zeller
+global name
+global width
+global height
+global fullscreen
+global window_state
+global auto_brightness_enabled
+global default_brightness_level
+global night_light_enabled
+global night_light_start_time
+global night_light_end_time
+global night_light_brightness_level
 
-# For PC dev work -----------------------
-if developermode == 1:
-    from kivy.config import Config
-    Config.set('graphics', 'width', '800')
-    Config.set('graphics', 'height', '480')
+version, name, \
+width, height, fullscreen, window_state, \
+auto_brightness_enabled, default_brightness_level, \
+night_light_enabled, night_light_start_time, night_light_end_time, night_light_brightness_level \
+    = [value for section, options in settings.get_all_config_options().items() for value in options.values()]
+printenvs = "%s %s %d %d %s %s %d %d %d %d %d %d" % (version, name, width, height, fullscreen, window_state,
+                                                     auto_brightness_enabled, default_brightness_level,
+                                                     night_light_enabled, night_light_start_time, night_light_end_time,
+                                                     night_light_brightness_level)
+from kivy.config import Config
 
-    from kivy.core.window import Window
-    Window.size = (800, 480)
+Config.set('graphics', 'width', width)
+Config.set('graphics', 'height', height)
+Config.set('graphics', 'fullscreen', fullscreen)
+Config.set('graphics', 'window_state', window_state)
+
+from kivy.core.window import Window
+
+Window.size = (width, height)
+
+global ip
+ip = ip_addresses
+global devtaps
+devtaps = 0
 # ---------------------------------------
 
-if developermode == 0:
-    import RPi.GPIO as GPIO
-    import obd
-    import serial
-global adxl345
-import sys
-import datetime
-import time
-import os
-import subprocess
-import glob
-import math
-import socket
-import pickle
-
-#IP address in System Diagnostics
-cmd = "ip addr show wlan0 | grep inet | awk '{print $2}' | cut -d/ -f1"
-def get_ip_address():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    return s.getsockname()[0]
-global ip
-try:
-    ip = get_ip_address()
-except:
-    ip = "No IP address found..."
-
-#AutoBrightness on Boot #set to 1 if you have the newer RPi display and want autobrightness
-                        #set to 0 if you do not or do not want autobrightness
-                        #adjust to suit your needs :)
-global autobrightness
-autobrightness = 0
-
-if developermode == 0:
-    if autobrightness == 1: #temporary method
-        currenthour = int(time.strftime("%-H")) #hour as decimal (24hour)
-        if currenthour < 7 or currenthour > 21: #earlier than 7am and later than 9pm -> dim screen on start
-            print "dim"
-            os.system("sudo echo 15 > /sys/class/backlight/rpi_backlight/brightness")  # sets screen brightness to ~ 10%
-
-        if currenthour >= 7 and currenthour <= 20: #later than 7am and before 8pm -> full bright on start
-            print "bright"
-            os.system("sudo echo 175 > /sys/class/backlight/rpi_backlight/brightness")  # sets screen brightness to ~ 100%
 
 #_____________________________________________________________
 #GPIO SETUP
@@ -134,7 +117,7 @@ passwindowupPin = 18
 HotKey1Pin = 12
 HotKey2Pin = 6
 
-if developermode == 0:
+if is_rpi:
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
     GPIO.setup(seekupPin, GPIO.OUT)
@@ -166,70 +149,29 @@ if developermode == 0:
     GPIO.output(passwindowdownPin, GPIO.HIGH)
     GPIO.output(passwindowupPin, GPIO.HIGH)
 
-#_________________________________________________________________
-#OBD STUFF
-global OBDON #var for displaying obd gauges
-OBDVAR = "NONE"
-#0 - OFF
-#1 - Digital Speed
-#2 - Digital Tach
-#3 - Graphic
-#4 - Coolant Temp
-#5 - Intake Temp
-#6 - Engine Load
-#7 - Throttle Pos
-#8 - Intake Pressure
+    # global AccelPresent #set to 1 if adxl345 accelerometer is present
+    # AccelPresent = 1
+    #
+    # global accelxmaxpos
+    # global accelxmaxneg
+    # global accelymaxpos
+    # global accelymaxneg
+    # accelxmaxpos = 0
+    # accelxmaxneg = 0
+    # accelymaxpos = 0
+    # accelymaxneg = 0
+    # if AccelPresent == 1:
+    #     try:
+    #         from adxl345 import ADXL345
+    #         adxl345 = ADXL345()
+    #     except:
+    #         print("Failed to initialize accelerometer.")
+    #
+    #         AccelPresent = 0
+    # global ACCELON
+    # ACCELON = 0
 
-#_________________________________________________________________
-#TEMP PROBE STUFF
-global TempProbePresent #set to 1 if temp probe is connected, 0 if not
-TempProbePresent = 1
-
-global AccelPresent #set to 1 if adxl345 accelerometer is present
-AccelPresent = 1
-
-global accelxmaxpos
-global accelxmaxneg
-global accelymaxpos
-global accelymaxneg
-accelxmaxpos = 0
-accelxmaxneg = 0
-accelymaxpos = 0
-accelymaxneg = 0
-
-if developermode == 1:
-    TempProbePresent = 0
-    AccelPresent = 0
-
-if AccelPresent == 1:
-    try:
-        from adxl345 import ADXL345
-        adxl345 = ADXL345()
-    except:
-        print "Failed to initialize accelerometer."
-        AccelPresent = 0
-
-if TempProbePresent == 1:
-    try:
-        os.system('modprobe w1-gpio')
-        os.system('modprobe w1-therm')
-        base_dir = '/sys/bus/w1/devices/'
-        device_folder = glob.glob(base_dir + '28*')[0]
-        device_file = device_folder + '/w1_slave'
-    except:
-        print "Failed to initialize temperature sensor."
-        TempProbePresent = 0
-
-global temp_f #make this var global for use in messages
-temp_f = 0
-
-global TEMPON #var for displaying cabin temp widget
-TEMPON = 0
-
-global ACCELON
-ACCELON = 0
-
-if developermode == 0:
+    # if is_rpi:
     os.system('pulseaudio --start') #start the pulseaudio daemon
 
 global bluetoothdevicemac
@@ -244,26 +186,6 @@ DISPLAYBTDATA = 0
 global bluetoothdata
 bluetoothdata = ['','','','','','','','','','','',''] #Default - only shown when bluetooth enabled
 
-
-def read_temp_raw():
-    f = open(device_file, 'r')
-    lines = f.readlines()
-    f.close()
-    return lines
- 
-def read_temp():
-    global temp_f
-    lines = read_temp_raw()
-    while lines[0].strip()[-3:] != 'YES':
-        #time.sleep(0.2)
-        lines = read_temp_raw()
-    equals_pos = lines[1].find('t=')
-    if equals_pos != -1:
-        temp_string = lines[1][equals_pos+2:]
-        temp_c_raw = float(temp_string) / 1000.0
-        temp_f_raw = temp_c_raw * 9.0 / 5.0 + 32.0
-        temp_f = "{0:.0f}".format(temp_f_raw) #only whole numbers
-
 #_________________________________________________________________
 #VARIABLES
 
@@ -272,13 +194,6 @@ global theme
 global wallpaper
 global hotkey1string
 global hotkey2string
-global oildatemonth
-global oildateday
-global oildateyear
-global oilmileage
-global oilnotify
-global speedlimit
-global rpmredline
 
 f = open('savedata.txt', 'r+') # read from text file
 theme = f.readline()
@@ -288,13 +203,6 @@ hotkey1string = f.readline()
 hotkey1string = hotkey1string.rstrip()
 hotkey2string = f.readline()
 hotkey2string = hotkey2string.rstrip()
-oildatemonth = int(f.readline())
-oildateday = int(f.readline())
-oildateyear = int(f.readline())
-oilmileage = int(f.readline())
-oilnotify = int(f.readline())
-speedlimit = int(f.readline())
-rpmredline = int(f.readline())
 f.close()
 
 global SEEKUPON 
@@ -314,25 +222,6 @@ GARAGEON = 0
 
 global RADARON 
 RADARON = 0
-
-global LEDSON 
-LEDSON = 0
-
-global WINDOWSDOWNON 
-WINDOWSDOWNON = 0
-
-global WINDOWSUPON 
-WINDOWSUPON = 0
-
-# window debug vars
-global DRIVERUPON
-DRIVERUPON = 0
-global DRIVERDOWNON
-DRIVERDOWNON = 0
-global PASSENGERUPON
-PASSENGERUPON = 0
-global PASSENGERDOWNON
-PASSENGERDOWNON = 0
 
 global clock
 clock = 0
@@ -367,12 +256,6 @@ testvar2 = 0
 global screenon
 screenon = 1
 
-global windowuptime #time it takes front windows to rise (secs)
-windowuptime = 7
-
-global windowdowntime #time it takes front windows to open (secs)
-windowdowntime = 6
-
 global clocktheme
 clocktheme = 2
 
@@ -385,51 +268,12 @@ animation_start_time = 0
 global time_second_mod
 time_second_mod = 0
 
-#OBD Global vars
-global OBDconnection
-OBDconnection = 0 #connection is off by default - will be turned on in obd page
-
-global OBDpage
-OBDpage = 0 #start obd page in gauge select
-
-global cmd_RPM
-global cmd_SPEED
-global cmd_CoolantTemp
-global cmd_IntakeTemp
-global cmd_Load
-global cmd_ThrottlePos
-global cmd_IntakePressure
-
-global maxRPM
-maxRPM = 0
-
-global devobd
-devobd = 0
-global incobd #amount to step in dev mode - obd pages
-incobd = 1
-
-global changeoil
-changeoil = 0
-if oilnotify == 1:
-    if int(time.strftime("%Y")) > oildateyear:
-        changeoil = 1
-    if int(time.strftime("%m")) >= oildatemonth:
-        if int(time.strftime("%Y")) > oildateyear:
-            changeoil = 1
-    if int(time.strftime("%d")) >= oildateday:
-        if int(time.strftime("%m")) >= oildatemonth:
-            if int(time.strftime("%Y")) >= oildateyear:
-                changeoil = 1
 #__________________________________________________________________
 #HOTKEY STUFF
 
 def HotKey1(channel):
     global hotkey1string
     global screenon
-    global windowuptime
-    global windowdowntime
-    global WINDOWSUPON
-    global WINDOWSDOWNON
     if hotkey1string == "Seek Up":
         if BLUETOOTHON == 0:
             Clock.schedule_once(seekup_callback)
@@ -438,7 +282,7 @@ def HotKey1(channel):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_'+bluetoothdevicemac+'/player0 org.bluez.MediaPlayer1.Next')
             except:
-                print "can't next"
+                print("can't next")
     if hotkey1string == "Seek Down":
         if BLUETOOTHON == 0:
             Clock.schedule_once(seekdown_callback)
@@ -447,28 +291,12 @@ def HotKey1(channel):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_'+bluetoothdevicemac+'/player0 org.bluez.MediaPlayer1.Previous')
             except:
-                print "can't prev"
+                print("can't prev")
     if hotkey1string == "Garage":
         Clock.schedule_once(garage_callback)
         Clock.schedule_once(garage_callback,.1)
     if hotkey1string == "Radar":
         Clock.schedule_once(radar_callback)
-    if hotkey1string == "Cup Lights":
-        Clock.schedule_once(leds_callback)
-    if hotkey1string == "Windows Up":
-        if WINDOWSDOWNON == 0: #only works when windows down isnt running
-            Clock.schedule_once(windowsup_callback)
-            Clock.schedule_once(windowsupOFF_callback, windowuptime)
-            return
-        if WINDOWSUPON == 1:
-            Clock.schedule_once(windowsupOFF_callback) #if windows going up while pushed, will cancel and stop windows
-    if hotkey1string == "Windows Down":
-        if WINDOWSUPON == 0: #only works when windows up isnt running
-            Clock.schedule_once(windowsdown_callback)
-            Clock.schedule_once(windowsdownOFF_callback, windowdowntime)
-            return
-        if WINDOWSDOWNON == 1:
-            Clock.schedule_once(windowsdownOFF_callback) #if windows going down while pushed, will cancel and stop windows
     if hotkey1string == "Screen Toggle":
         if screenon == 1:
             os.system("sudo echo 1 > /sys/class/backlight/rpi_backlight/bl_power") #turns screen off
@@ -485,10 +313,6 @@ def HotKey1(channel):
 def HotKey2(channel):
     global hotkey2string
     global screenon
-    global windowuptime
-    global windowdowntime
-    global WINDOWSUPON
-    global WINDOWSDOWNON
     if hotkey2string == "Seek Up":
         if BLUETOOTHON == 0:
             Clock.schedule_once(seekup_callback)
@@ -497,7 +321,7 @@ def HotKey2(channel):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_' + bluetoothdevicemac + '/player0 org.bluez.MediaPlayer1.Next')
             except:
-                print "can't next"
+                print("can't next")
     if hotkey2string == "Seek Down":
         if BLUETOOTHON == 0:
             Clock.schedule_once(seekdown_callback)
@@ -506,28 +330,12 @@ def HotKey2(channel):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_' + bluetoothdevicemac + '/player0 org.bluez.MediaPlayer1.Previous')
             except:
-                print "can't prev"
+                print("can't prev")
     if hotkey2string == "Garage":
         Clock.schedule_once(garage_callback)
         Clock.schedule_once(garage_callback,.1)
     if hotkey2string == "Radar":
         Clock.schedule_once(radar_callback)
-    if hotkey2string == "Cup Lights":
-        Clock.schedule_once(leds_callback)
-    if hotkey2string == "Windows Up":
-        if WINDOWSDOWNON == 0: #only works when windows down isnt running
-            Clock.schedule_once(windowsup_callback)
-            Clock.schedule_once(windowsupOFF_callback, windowuptime)
-            return
-        if WINDOWSUPON == 1:
-            Clock.schedule_once(windowsupOFF_callback) #if windows going up while pushed, will cancel and stop windows
-    if hotkey2string == "Windows Down":
-        if WINDOWSUPON == 0: #only works when windows up isnt running
-            Clock.schedule_once(windowsdown_callback)
-            Clock.schedule_once(windowsdownOFF_callback, windowdowntime)
-            return
-        if WINDOWSDOWNON == 1:
-            Clock.schedule_once(windowsdownOFF_callback) #if windows going down while pushed, will cancel and stop windows
     if hotkey2string == "Screen Toggle":
         if screenon == 1:
             os.system("sudo echo 1 > /sys/class/backlight/rpi_backlight/bl_power") #turns screen off
@@ -540,7 +348,8 @@ def HotKey2(channel):
     if hotkey2string == "None":
         return
 
-if developermode == 0:
+
+if is_rpi:
     GPIO.add_event_detect(HotKey1Pin, GPIO.FALLING, callback=HotKey1, bouncetime=500)
     GPIO.add_event_detect(HotKey2Pin, GPIO.FALLING, callback=HotKey2, bouncetime=500)
 
@@ -601,8 +410,10 @@ class TestAppScreen(Screen):
     pass
 class MaintenanceScreen(Screen):
     pass
-class MaintenanceSetOilInfoScreen(Screen):
-    pass
+
+
+# class MaintenanceSetOilInfoScreen(Screen):
+#     pass
 class GPSScreen(Screen):
     pass
 class StopwatchScreen(Screen):
@@ -619,40 +430,42 @@ class LaunchControlScreen(Screen):
     pass
 class PhotosScreen(Screen):
     pass
-class GaugeSelectScreen(Screen):
-    pass
-class OBDTachsScreen(Screen):
-    pass
-class OBDSpeedosScreen(Screen):
-    pass
-class OBDDiagnosticsScreen(Screen):
-    pass
-class GaugeSelectScreen(Screen):
-    pass
-class GaugeSelectScreen(Screen):
-    pass
-class OBDDigitalSpeedoScreen(Screen):
-    pass
-class OBDDigitalTachScreen(Screen):
-    pass
-class OBDGraphicTachScreen(Screen):
-    pass
-class OBDGraphicTach2Screen(Screen):
-    pass
-class OBDCoolantScreen(Screen):
-    pass
-class OBDIntakeTempScreen(Screen):
-    pass
-class OBDLoadScreen(Screen):
-    pass
-class OBDThrottlePosScreen(Screen):
-    pass
-class OBDIntakePressureScreen(Screen):
-    pass
-class OBDSettingsScreen(Screen):
-    pass
-class AccelerometerScreen(Screen):
-    pass
+
+
+# class GaugeSelectScreen(Screen):
+#     pass
+# class OBDTachsScreen(Screen):
+#     pass
+# class OBDSpeedosScreen(Screen):
+#     pass
+# class OBDDiagnosticsScreen(Screen):
+#     pass
+# class GaugeSelectScreen(Screen):
+#     pass
+# class GaugeSelectScreen(Screen):
+#     pass
+# class OBDDigitalSpeedoScreen(Screen):
+#     pass
+# class OBDDigitalTachScreen(Screen):
+#     pass
+# class OBDGraphicTachScreen(Screen):
+#     pass
+# class OBDGraphicTach2Screen(Screen):
+#     pass
+# class OBDCoolantScreen(Screen):
+#     pass
+# class OBDIntakeTempScreen(Screen):
+#     pass
+# class OBDLoadScreen(Screen):
+#     pass
+# class OBDThrottlePosScreen(Screen):
+#     pass
+# class OBDIntakePressureScreen(Screen):
+#     pass
+# class OBDSettingsScreen(Screen):
+#     pass
+# class AccelerometerScreen(Screen):
+#     pass
 class NOSScreen(Screen):
     pass
 class WallpaperSelectScreen(Screen):
@@ -701,36 +514,7 @@ class MainApp(App):
     radariconsource = StringProperty()
     lightsiconsource = StringProperty()
     wallpapernow = StringProperty()
-    obdspeed = StringProperty()
-    obdspeedval = ObjectProperty()
-    obdspeedlimitval = ObjectProperty(speedlimit)
-    obdspeedmax = StringProperty()
-    obdRPM = StringProperty()
-    obdRPMval = NumericProperty(0)
-    obdRPMmax = StringProperty()
-    maxRPMvar = ObjectProperty()
-    obdRPMredline = ObjectProperty(rpmredline)
-    obdcoolanttemp = StringProperty()
-    obdcoolanttempval = ObjectProperty()
-    obdintaketemp = StringProperty()
-    obdintakepressure = StringProperty()
-    obdengineload = StringProperty()
-    obdengineloadval = ObjectProperty()
-    obdthrottlepos = StringProperty()
-    obdthrottleposval = ObjectProperty()
-    oildatemonth = ObjectProperty()
-    oildateday = ObjectProperty()
-    oildateyear = ObjectProperty()
-    oilmileage = ObjectProperty()
-    oilnotify = ObjectProperty()
-    changeoil = ObjectProperty()
     ip = StringProperty()
-    accelx = NumericProperty(0)
-    accely = NumericProperty(0)
-    accelxmaxpos = ObjectProperty()
-    accelxmaxneg = ObjectProperty()
-    accelymaxpos = ObjectProperty()
-    accelymaxneg = ObjectProperty()
     bluetoothtitle = StringProperty()
     bluetoothartist = StringProperty()
     bluetoothduration = NumericProperty(0)
@@ -778,24 +562,6 @@ class MainApp(App):
         self.yearnow = year
         self.ampm = ampm
 
-    def updatetemp(self, *args):
-        temp_f_string = str(temp_f)
-        #if int(float(animation_start_time))+5 <= int(float(time_second_mod)): #animation is delayed for better asthetics
-        global TEMPON
-        if TEMPON == 1:
-            if TempProbePresent == 1:
-                    read_temp()
-                    tempnow = " " + temp_f_string + u'\N{DEGREE SIGN}'
-            if TempProbePresent == 0:
-                    tempnow = " " + "72" + u'\N{DEGREE SIGN}'
-        if TEMPON == 0:
-            if TempProbePresent == 1:
-                    tempnow = " " + temp_f_string + u'\N{DEGREE SIGN}'
-            if TempProbePresent == 0:
-                    tempnow = " " + "72" + u'\N{DEGREE SIGN}'
-
-        self.tempnow = tempnow
-
     def updatevariables(self, *args):
         global swminute
         global swsecond
@@ -806,7 +572,7 @@ class MainApp(App):
         global swsecondstring
         global version
         global devtaps
-        global OBDpage
+        # global OBDpage
         if swactive == 1:
             swtenth += 1
             if swtenth == 10:
@@ -834,13 +600,6 @@ class MainApp(App):
         self.version = version
         self.ip = ip
         self.devtaps = devtaps
-        self.oildatemonth = oildatemonth
-        self.oildateday = oildateday
-        self.oildateyear = oildateyear
-        self.oilmileage = oilmileage
-        self.oilnotify = oilnotify
-        self.changeoil = changeoil
-        self.OBDpage = OBDpage
 
         global BLUETOOTHON
         if BLUETOOTHON == 1:
@@ -880,11 +639,6 @@ class MainApp(App):
             self.radariconsource = 'data/icons/radarindicator.png'
         if RADARON == 0:
             self.radariconsource = 'data/icons/null.png'
-        if LEDSON == 1:
-            self.lightsiconsource = 'data/icons/app_icons/lights_icon_on.png'
-        if LEDSON == 0:
-            self.lightsiconsource = 'data/icons/app_icons/lights_icon.png'
-
         if wallpaper == 0:
             self.wallpapernow = 'data/wallpapers/greenmaterial.png'
         if wallpaper == 1:
@@ -963,290 +717,55 @@ class MainApp(App):
         if message == 0:
             self.text = " "
         if message == 1:  # used for displaying the CPU temp
-            if developermode == 0:
+            if is_rpi:
                 temperaturestring = subprocess.check_output(["/opt/vc/bin/vcgencmd", "measure_temp"])
                 corevoltagestring = subprocess.check_output(["/opt/vc/bin/vcgencmd", "measure_volts core"])
                 temperature = (temperaturestring.split('=')[1][:-3])
                 corevoltage = (corevoltagestring.split('=')[1][:-3])
                 CPUtempnow = temperature + u'\N{DEGREE SIGN}' + "C"
                 corevoltagenow = corevoltage + " V"
-            if developermode == 1:
+            if developermode == 0:
                 CPUtempnow = "40" + u'\N{DEGREE SIGN}' + "C"
                 corevoltagenow = "3.14" + " V"
             self.CPUtempnow = CPUtempnow
             self.corevoltagenow = corevoltagenow
 
-    def updateaccel(self, *args):
-        global ACCELON
-        global accelxmaxpos
-        global accelxmaxneg
-        global accelymaxpos
-        global accelymaxneg
-        if ACCELON == 1:
-            if AccelPresent == 1:
-                axes = adxl345.getAxes(True)
-                accelx = axes['x'] - .13  # compensation amount
-                self.accelx = accelx
-                accely = axes['y'] - .34  # compensation amount
-                self.accely = accely
-
-                if accelx > accelxmaxpos:
-                    accelxmaxpos = accelx
-                if accelx < accelxmaxneg:
-                    accelxmaxneg = accelx
-                if accely > accelymaxpos:
-                    accelymaxpos = accely
-                if accely < accelymaxneg:
-                    accelymaxneg = accely
-
-                self.accelxmaxpos = accelxmaxpos
-                self.accelxmaxneg = accelxmaxneg
-                self.accelymaxpos = accelymaxpos
-                self.accelymaxneg = accelymaxneg
-
-        if ACCELON == 0:
-            self.accelx = 0
-            self.accely = 0
-            self.accelxmaxpos = accelxmaxpos
-            self.accelxmaxneg = accelxmaxneg
-            self.accelymaxpos = accelymaxpos
-            self.accelymaxneg = accelymaxneg
-
-    def updateOBDdata(self, *args):
-
-        global clocktheme
-        global response_RPM_int_adjusted
-        global response_SPEED_int_adjusted
-        global devobd
-        global incobd
-        global maxRPM
-        global animation_time_start
-        global rpmredline
-        global speedlimit
-        # _____________________________________________________________________________________
-        if int(float(animation_start_time)) + 5 <= int(float(time_second_mod)):  # animation is delayed for better asthetics
-            if OBDVAR == "NONE":  # code for no OBD stuff
-                self.obdspeed = "0"
-                self.obdRPM = "0"
-                self.obdcoolanttemp = "0"
-                self.obdintaketemp = "0"
-                self.obdengineload = "0"
-
-            if OBDVAR == "SPEED":  # code for OBD Digital Speedo
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + 1
-                    else:
-                        devobd = devobd - 1
-                    if devobd > 125:
-                        incobd = 0
-                    if devobd < 1:
-                        incobd = 1
-                    self.obdspeed = str(devobd)
-                    self.obdspeedval = devobd
-                    self.obdspeedlimitval = speedlimit
-                else:
-                    if OBDconnection == 1:
-                        response_SPEED = connection.query(cmd_SPEED)  # send the command, and parse the response
-                        response_SPEED_string = str(response_SPEED.value)  # change value into a string for comparing to "None"
-
-                        if response_SPEED_string != 'None':  # only proceed if string value is not None
-
-                            response_SPEED_int = int(response_SPEED.value)  # change the var type to int
-
-                            # if response_SPEED_int == 0:  # to avoid the formula
-                            #     response_SPEED_int_adjusted = 0
-                            #     self.obdspeed = "0"
-                            #
-                            # if response_SPEED_int == 1:  # to avoid the formula
-                            #     response_SPEED_int_adjusted = 1
-                            #     self.obdspeed = "1"
-                            #
-                            # if response_SPEED_int == 2:  # to avoid the formula
-                            #     response_SPEED_int_adjusted = 1
-                            #     self.obdspeed = "1"
-                            #
-                            # if response_SPEED_int > 2:  # start to apply the formula to speed
-                            #     response_SPEED_int_adjusted = math.floor(((response_SPEED_int) * (.6278)) - .664)  # adjusts number according to formula and rounds down to nearesr whole MPH - sets new adjusted int
-                            #     response_SPEED_string_adjusted = str(response_SPEED_int_adjusted)  # sets string
-                            #     self.obdspeed = response_SPEED_string_adjusted.strip()[:-2]  # set text
-                            #
-                            # if  response_SPEED_int_adjusted > 60: #apply new formula after 60 mph - from driving tests
-                            #     response_SPEED_int_adjusted = math.floor((1.0264 * (response_SPEED_int_adjusted)) - 0.6739)
-                            #     response_SPEED_string_adjusted = str(response_SPEED_int_adjusted)  # sets string
-                            #     self.obdspeed = response_SPEED_string_adjusted.strip()[:-2]  # set text
-
-                            response_SPEED_int_adjusted = math.floor((response_SPEED_int)*0.6213711922)
-                            response_SPEED_string_adjusted = str(response_SPEED_int_adjusted)  # sets string
-                            self.obdspeed = response_SPEED_string_adjusted.strip()[:-2]  # set text
-
-
-                            self.obdspeedval = response_SPEED_int_adjusted
-                            self.obdspeedlimitval = speedlimit
-
-            if OBDVAR == "RPM":  # code for OBD Digital Tach
-                if developermode == 1: #code to simulate 0 to 6750 and back down - for testing purposes
-                    if incobd == 1:
-                        devobd = devobd + 10
-                    else:
-                        devobd = devobd - 10
-                    if devobd > 6900:
-                        incobd = 0
-                    if devobd < 100:
-                        incobd = 1
-                    if devobd > maxRPM:
-                        maxRPM = devobd
-                    self.obdRPMmax = str(maxRPM)
-                    self.obdRPM = str(devobd)
-                    self.obdRPMval = devobd
-                    self.obdRPMredline = rpmredline
-                else:
-                    if OBDconnection == 1:
-                        response_RPM = connection.query(cmd_RPM)  # send the command, and parse the response
-
-                        response_RPM_string = str(response_RPM.value)  # change value into a string for comparing to "None"
-
-                        if response_RPM_string != 'None':  # only proceed if string value is not None
-
-                            response_RPM_int = int(response_RPM.value)  # set int value
-                            response_RPM_int_adjusted = math.floor(response_RPM_int)  # round down to nearest whole RPM
-                            if response_RPM_int_adjusted > maxRPM:
-                                maxRPM = response_RPM_int_adjusted
-                            self.maxRPMvar = maxRPM
-                            maxRPM_string = str(maxRPM)
-                            maxRPM_string = maxRPM_string.strip()[:-2]  # strip .0 at the end of string
-                            response_RPM_string = str(response_RPM_int_adjusted)  # set string value
-                            response_RPM_string = response_RPM_string.strip()[:-2]  # strip .0 at the end of string
-                            self.obdRPM = response_RPM_string
-                            self.obdRPMmax = maxRPM_string
-                            self.obdRPMval = response_RPM_int
-                            self.obdRPMredline = rpmredline
-
-            if OBDVAR == "COOLANT_TEMP":  # code for OBD Coolant Temp
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + 1
-                    else:
-                        devobd = devobd - 1
-                    if devobd > 249:
-                        incobd = 0
-                    if devobd < 1:
-                        incobd = 1
-                    self.obdcoolanttemp = str(devobd) + u'\N{DEGREE SIGN}'
-                    self.obdcoolanttempval = devobd
-                else:
-                    if OBDconnection == 1:
-                        response_CoolantTemp = connection.query(cmd_CoolantTemp)  # send the command, and parse the response
-
-                        response_CoolantTemp_string = str(response_CoolantTemp.value)  # change value into a string for comparing to "None"
-
-                        if response_CoolantTemp_string != 'None':  # only proceed if string value is not None
-                            response_CoolantTemp_int = int(response_CoolantTemp.value) * 9.0 / 5.0 + 32.0  # set int value - change to farenheit
-                            response_CoolantTemp_int_adjusted = math.floor(response_CoolantTemp_int)  # round down to nearest whole RPM
-                            self.obdcoolanttempval = response_CoolantTemp_int_adjusted
-                            response_CoolantTemp_string = str(response_CoolantTemp_int_adjusted)  # set string value
-                            response_CoolantTemp_string = response_CoolantTemp_string.strip()[:-2]  # strip .0 at the end of string
-                            self.obdcoolanttemp = response_CoolantTemp_string + u'\N{DEGREE SIGN}'  # set text
-
-            if OBDVAR == "INTAKE_TEMP":  # code for OBD Intake Temp
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + 1
-                    else:
-                        devobd = devobd - 1
-                    if devobd > 120:
-                        incobd = 0
-                    if devobd < 1:
-                        incobd = 1
-                    self.obdintaketemp = str(devobd) + u'\N{DEGREE SIGN}'
-                else:
-                    if OBDconnection == 1:
-                        response_IntakeTemp = connection.query(cmd_IntakeTemp)  # send the command, and parse the response
-
-                        response_IntakeTemp_string = str(response_IntakeTemp.value)  # change value into a string for comparing to "None"
-
-                        if response_IntakeTemp_string != 'None':  # only proceed if string value is not None
-                            response_IntakeTemp_int = int(response_IntakeTemp.value) * 9.0 / 5.0 + 32.0  # set int value - change to farenheit
-                            response_IntakeTemp_int_adjusted = math.floor(response_IntakeTemp_int)  # round down to nearest whole RPM
-                            response_IntakeTemp_string = str(response_IntakeTemp_int_adjusted)  # set string value
-                            response_IntakeTemp_string = response_IntakeTemp_string.strip()[:-2]  # strip .0 at the end of string
-                            self.obdintaketemp = response_IntakeTemp_string + u'\N{DEGREE SIGN}'  # set text
-
-            if OBDVAR == "LOAD":  # code for OBD Engine Load
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + 1
-                    else:
-                        devobd = devobd - 1
-                    if devobd > 99:
-                        incobd = 0
-                    if devobd < 1:
-                        incobd = 1
-                    self.obdengineload = str(devobd) + '%'
-                    self.obdengineloadval = devobd
-                else:
-                    if OBDconnection == 1:
-                        response_Load = connection.query(cmd_Load)  # send the command, and parse the response
-
-                        response_Load_string = str(response_Load.value)  # change value into a string for comparing to "None"
-
-                        if response_Load_string != 'None':  # only proceed if string value is not None
-                            response_Load_int = int(response_Load.value)
-                            response_Load_int_adjusted = math.floor(response_Load_int)  # round down to nearest whole RPM
-                            response_Load_string = str(response_Load_int_adjusted)  # set string value
-                            response_Load_string = response_Load_string.strip()[:-2]  # strip .0 at the end of string
-                            self.obdengineload = response_Load_string + '%'  # set text
-                            self.obdengineloadval = response_Load_int_adjusted #value, for progress bar
-
-            if OBDVAR == "THROTTLE_POS":  # code for OBD Throttle Position
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + 1
-                    else:
-                        devobd = devobd - 1
-                    if devobd > 99:
-                        incobd = 0
-                    if devobd < 1:
-                        incobd = 1
-                    self.obdthrottlepos = str(devobd) + '%'
-                    self.obdthrottleposval = devobd
-                else:
-                    if OBDconnection == 1:
-                        response_ThrottlePos = connection.query(cmd_ThrottlePos)  # send the command, and parse the response
-
-                        response_ThrottlePos_string = str(response_ThrottlePos.value)  # change value into a string for comparing to "None"
-
-                        if response_ThrottlePos_string != 'None':  # only proceed if string value is not None
-                            response_ThrottlePos_int = int(response_ThrottlePos.value)
-                            response_ThrottlePos_int_adjusted = math.floor(response_ThrottlePos_int)  # round down to nearest whole RPM
-                            response_ThrottlePos_string = str(response_ThrottlePos_int_adjusted)  # set string value
-                            response_ThrottlePos_string = response_ThrottlePos_string.strip()[:-2]  # strip .0 at the end of string
-                            self.obdthrottlepos = response_ThrottlePos_string + '%'  # set text
-                            self.obdthrottleposval = response_ThrottlePos_int_adjusted #value, for progress bar
-
-            if OBDVAR == "INTAKE_PRESSURE":  # code for OBD Intake Pressure
-                if developermode == 1:
-                    if incobd == 1:
-                        devobd = devobd + .1
-                    else:
-                        devobd = devobd - .1
-                    if devobd > -.1:
-                        incobd = 0
-                    if devobd < -14.7:
-                        incobd = 1
-                    self.obdintakepressure = str(devobd)
-                else:
-                    if OBDconnection == 1:
-                        response_IntakePressure = connection.query(cmd_IntakePressure)  # send the command, and parse the response
-
-                        response_IntakePressure_string = str(response_IntakePressure.value)  # change value into a string for comparing to "None"
-
-                        if response_IntakePressure_string != 'None':  # only proceed if string value is not None
-                            response_IntakePressure_int = (int(response_IntakePressure.value)-101.325) * 0.145038 # set int value - compare against atmospheric pressure for vaccuum - change to psi
-                            response_IntakePressure_int_adjusted = round(response_IntakePressure_int, 2)  # round down to 2 decimal places
-                            response_IntakePressure_string = str(response_IntakePressure_int_adjusted)  # set string value
-
-                            self.obdintakepressure = response_IntakePressure_string  # set text
+    #
+    # def updateaccel(self, *args):
+    #     global ACCELON
+    #     global accelxmaxpos
+    #     global accelxmaxneg
+    #     global accelymaxpos
+    #     global accelymaxneg
+    #     if ACCELON == 1:
+    #         if AccelPresent == 1:
+    #             axes = adxl345.getAxes(True)
+    #             accelx = axes['x'] - .13  # compensation amount
+    #             self.accelx = accelx
+    #             accely = axes['y'] - .34  # compensation amount
+    #             self.accely = accely
+    #
+    #             if accelx > accelxmaxpos:
+    #                 accelxmaxpos = accelx
+    #             if accelx < accelxmaxneg:
+    #                 accelxmaxneg = accelx
+    #             if accely > accelymaxpos:
+    #                 accelymaxpos = accely
+    #             if accely < accelymaxneg:
+    #                 accelymaxneg = accely
+    #
+    #             self.accelxmaxpos = accelxmaxpos
+    #             self.accelxmaxneg = accelxmaxneg
+    #             self.accelymaxpos = accelymaxpos
+    #             self.accelymaxneg = accelymaxneg
+    #
+    #     if ACCELON == 0:
+    #         self.accelx = 0
+    #         self.accely = 0
+    #         self.accelxmaxpos = accelxmaxpos
+    #         self.accelxmaxneg = accelxmaxneg
+    #         self.accelymaxpos = accelymaxpos
+    #         self.accelymaxneg = accelymaxneg
 
     def build(self):
         global developermode
@@ -1256,15 +775,10 @@ class MainApp(App):
 
         Clock.schedule_interval(self.updatetime, .1)
         Clock.schedule_interval(self.updatedate, 1)
-        Clock.schedule_interval(self.updatetemp, 1)
+        # Clock.schedule_interval(self.updatetemp, 1)
         Clock.schedule_interval(self.updatevariables, .104556) #weird number to get RPi stopwatch as close as possible - found through testing
         Clock.schedule_interval(self.updatemessage, 1)
-        Clock.schedule_interval(self.updateaccel, .1)
-        if developermode == 1:
-            Clock.schedule_interval(self.updateOBDdata, .01)
-        else:
-            Clock.schedule_interval(self.updateOBDdata, .1)
-
+        #        Clock.schedule_interval(self.updateaccel, .1)
         #add the widgets
         
         root.add_widget(KVFILE) #adds the main GUI
@@ -1350,14 +864,14 @@ class MainApp(App):
                 #maybe try this: subprocess.call('sudo shutdown now', shell=True)
 
             except:
-                print "can't play"
+                print("can't play")
 
     def bluetoothpause_callback_schedge(obj):
         if BLUETOOTHON == 1:
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_'+bluetoothdevicemac+'/player0 org.bluez.MediaPlayer1.Pause')
             except:
-                print "can't pause"
+                print("can't pause")
 
     def seekup_callback_schedge(obj):
         if BLUETOOTHON == 0:
@@ -1367,7 +881,7 @@ class MainApp(App):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_'+bluetoothdevicemac+'/player0 org.bluez.MediaPlayer1.Next')
             except:
-                print "can't next"
+                print("can't next")
 
     def seekdown_callback_schedge(obj):
         if BLUETOOTHON == 0:
@@ -1377,7 +891,7 @@ class MainApp(App):
             try:
                 os.system('dbus-send --system --type=method_call --dest=org.bluez /org/bluez/hci0/dev_'+bluetoothdevicemac+'/player0 org.bluez.MediaPlayer1.Previous')
             except:
-                print "can't prev"
+                print("can't prev")
 
     def aux_callback_schedge(obj):
         Clock.schedule_once(aux_callback)
@@ -1416,47 +930,15 @@ class MainApp(App):
     def leds_callback_schedge(obj):
         Clock.schedule_once(leds_callback) #called once so next press alternates status
 
-    def windowsup_callback_schedge(obj):
-        global WINDOWSUPON
-        global WINDOWSDOWNON
-        if WINDOWSDOWNON == 0: #only works when windows down isnt running
-            Clock.schedule_once(windowsup_callback) #called once so next press alternates status
-            Clock.schedule_once(windowsupOFF_callback, windowuptime) #on for set x secs, then off again - time needs edited
-            return
-        if WINDOWSUPON == 1:
-            Clock.schedule_once(windowsupOFF_callback) #if windows going up while pushed, will cancel and stop windows
-
-    def windowsdown_callback_schedge(obj):
-        global WINDOWSUPON
-        global WINDOWSDOWNON
-        if WINDOWSUPON == 0: #only works when windows up isnt running
-            Clock.schedule_once(windowsdown_callback) #called once so next press alternates status
-            Clock.schedule_once(windowsdownOFF_callback, windowdowntime) #on for set x secs, then off again - time needs edited
-            return
-        if WINDOWSDOWNON == 1:
-            Clock.schedule_once(windowsdownOFF_callback) #if windows going down while pushed, will cancel and stop windows
-
-    # following 6 functions serve purpose to debug windows
-    def driverup_callback_schedge(obj):
-        Clock.schedule_once(driverup_callback) #called once - setup to only activate when button is down
-    def driverstop_callback_schedge(obj):
-        Clock.schedule_once(driverstop_callback) #called once - setup to only activate when button is down
-    def driverdown_callback_schedge(obj):
-        Clock.schedule_once(driverdown_callback) #called once - setup to only activate when button is down
-    def passengerup_callback_schedge(obj):
-        Clock.schedule_once(passengerup_callback) #called once - setup to only activate when button is down
-    def passengerstop_callback_schedge(obj):
-        Clock.schedule_once(passengerstop_callback) #called once - setup to only activate when button is down
-    def passengerdown_callback_schedge(obj):
-        Clock.schedule_once(passengerdown_callback) #called once - setup to only activate when button is down
-    def allwindowsstop_callback_schedge(obj):
-        Clock.schedule_once(allwindowsstop_callback) #called once - setup to only activate when button is down
-
 #VARIBLE SETTINGS
     def add_launch(obj): #use on_release: app.add_launchanalog() to call - used to create the lights on the xmas tree drag lights
         global time_second_mod
         global launch_start_time
         launch_start_time = int(float(time_second_mod)) #sets a reference time for launch control timing
+
+    def killtemp(obj):  # used to kill the temp label when on screens other than main
+        global TEMPON
+        TEMPON = 0
 
     #messages
     def kill_message(obj): #use on_release: app.kill_message() to call
@@ -1470,7 +952,7 @@ class MainApp(App):
     def update_IP(obj): #updates IP address on button tap in System Diagnostics
         global ip
         try:
-            ip = get_ip_address()
+            ip = ip_addresses()
         except:
             ip = "No IP address found..."
 
@@ -1504,15 +986,6 @@ class MainApp(App):
     def sethotkey1_Radar(obj):
         global hotkey1string
         hotkey1string = "Radar"
-    def sethotkey1_CupLights(obj):
-        global hotkey1string
-        hotkey1string = "Cup Lights"
-    def sethotkey1_WindowsUp(obj):
-        global hotkey1string
-        hotkey1string = "Windows Up"
-    def sethotkey1_WindowsDown(obj):
-        global hotkey1string
-        hotkey1string = "Windows Down"
     def sethotkey1_ScreenToggle(obj):
         global hotkey1string
         hotkey1string = "Screen Toggle"
@@ -1533,15 +1006,6 @@ class MainApp(App):
     def sethotkey2_Radar(obj):
         global hotkey2string
         hotkey2string = "Radar"
-    def sethotkey2_CupLights(obj):
-        global hotkey2string
-        hotkey2string = "Cup Lights"
-    def sethotkey2_WindowsUp(obj):
-        global hotkey2string
-        hotkey2string = "Windows Up"
-    def sethotkey2_WindowsDown(obj):
-        global hotkey2string
-        hotkey2string = "Windows Down"
     def sethotkey2_ScreenToggle(obj):
         global hotkey2string
         hotkey2string = "Screen Toggle"
@@ -1579,32 +1043,11 @@ class MainApp(App):
         global wallpaper
         global hotkey1string
         global hotkey2string
-        global oildatemonth
-        global oildateday
-        global oildateyear
-        global oilmileage
-        global oilnotify
-        global speedlimit
-        global rpmredline
         wallpaper = str(wallpaper)
-        oildatemonth = str(oildatemonth)
-        oildateday = str(oildateday)
-        oildateyear = str(oildateyear)
-        oilmileage = str(oilmileage)
-        oilnotify = str(oilnotify)
-        speedlimit = str(int(speedlimit))
-        rpmredline = str(int(rpmredline))
         f = open('savedata.txt', 'r+')
         f.truncate() # wipe everything
-        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string + "\n" + oildatemonth + "\n" + oildateday + "\n" + oildateyear + "\n" + oilmileage + "\n" + oilnotify + "\n" + speedlimit + "\n" + rpmredline)
+        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string)
         f.close()
-        oildatemonth = int(oildatemonth)
-        oildateday = int(oildateday)
-        oildateyear = int(oildateyear)
-        oilmileage = int(oilmileage)
-        oilnotify = int(oilnotify)
-        speedlimit = int(speedlimit)
-        rpmredline = int(rpmredline)
 
     def shutdown(obj):
         # save new varibles for next boot
@@ -1612,32 +1055,11 @@ class MainApp(App):
         global wallpaper
         global hotkey1string
         global hotkey2string
-        global oildatemonth
-        global oildateday
-        global oildateyear
-        global oilmileage
-        global oilnotify
-        global speedlimit
-        global rpmredline
         wallpaper = str(wallpaper)
-        oildatemonth = str(oildatemonth)
-        oildateday = str(oildateday)
-        oildateyear = str(oildateyear)
-        oilmileage = str(oilmileage)
-        oilnotify = str(oilnotify)
-        speedlimit = str(int(speedlimit))
-        rpmredline = str(int(rpmredline))
         f = open('savedata.txt', 'r+')
         f.truncate() # wipe everything
-        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string + "\n" + oildatemonth + "\n" + oildateday + "\n" + oildateyear + "\n" + oilmileage + "\n" + oilnotify + "\n" + speedlimit + "\n" + rpmredline)
+        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string)
         f.close()
-        oildatemonth = int(oildatemonth)
-        oildateday = int(oildateday)
-        oildateyear = int(oildateyear)
-        oilmileage = int(oilmileage)
-        oilnotify = int(oilnotify)
-        speedlimit = int(speedlimit)
-        rpmredline = int(rpmredline)
 
         # turn off screen and shutdown
         os.system("sudo echo 1 > /sys/class/backlight/rpi_backlight/bl_power") #turns screen off
@@ -1649,31 +1071,11 @@ class MainApp(App):
         global wallpaper
         global hotkey1string
         global hotkey2string
-        global oildatemonth
-        global oildateday
-        global oildateyear
-        global oilmileage
-        global oilnotify
-        global speedlimit
-        global rpmredline
         wallpaper = str(wallpaper)
-        oildatemonth = str(oildatemonth)
-        oildateday = str(oildateday)
-        oildateyear = str(oildateyear)
-        oilmileage = str(oilmileage)
-        speedlimit = str(int(speedlimit))
-        rpmredline = str(int(rpmredline))
         f = open('savedata.txt', 'r+')
         f.truncate()
-        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string + "\n" + oildatemonth + "\n" + oildateday + "\n" + oildateyear + "\n" + oilmileage + "\n" + oilnotify + "\n" + speedlimit + "\n" + rpmredline)
+        f.write(theme + "\n" + wallpaper + "\n" + hotkey1string + "\n" + hotkey2string)
         f.close()
-        oildatemonth = int(oildatemonth)
-        oildateday = int(oildateday)
-        oildateyear = int(oildateyear)
-        oilmileage = int(oilmileage)
-        oilnotify = int(oilnotify)
-        speedlimit = int(speedlimit)
-        rpmredline = int(rpmredline)
 
         os.system("sudo reboot")
 
@@ -1702,208 +1104,67 @@ class MainApp(App):
     def BrightnessSet5(obj):
         os.system("sudo echo 200 > /sys/class/backlight/rpi_backlight/brightness") #sets screen brightness to ~ 100%
 
-    def killtemp(obj): #used to kill the temp label when on screens other than main
-        global TEMPON
-        TEMPON = 0
-
-    def addtemp(obj): #used to kill the temp label when on screens other than main
-        global TEMPON
-        global animation_start_time
-        TEMPON = 1
-        animation_start_time = int(float(time_second_mod)) #sets a reference time for animations
-
-    def killaccel(obj):
-        global ACCELON
-        ACCELON = 0
-
-    def addaccel(obj):
-        global ACCELON
-        ACCELON = 1
-
-    def resetaccelmaxes(obj):
-        global accelxmaxpos
-        global accelxmaxneg
-        global accelymaxpos
-        global accelymaxneg
-        accelxmaxpos = 0
-        accelxmaxneg = 0
-        accelymaxpos = 0
-        accelymaxneg = 0
-
-    def connect_OBD(obj): #sets value to one so connection code only runs once
-        global OBDconnection
-        if developermode == 0:
-            OBDconnection = 1
-
-    def set_OBDVAR(obj,OBDVARIABLE): #used to change the OBD label to other types of data
-        global OBDVAR
-        global devobd
-        global time_second_mod
-        global animation_start_time
-        OBDVAR = OBDVARIABLE
-        if OBDVAR == "NONE":
-            devobd = 0
-        animation_start_time = int(float(time_second_mod)) #sets a reference time for animations
-
-    def zero_RPMmax(obj): #zeros out RPM max
-        global maxRPM
-        maxRPM = 0
-
-    def redline_value(self, instance, value): #function that is updated when redline slider is moved
-        global rpmredline
-        rpmredline = value
-
-    def speedlimit_value(self, instance, value): #function that is updated when speed limit slider is moved
-        global speedlimit
-        speedlimit = value
-
-    def set_OBDpage(obj, OBDpagevar):
-        global OBDpage
-        OBDpage = OBDpagevar
-        #print OBDpage #testing
-
-
-
-    #_________________________________________________________________
-
-    #Function to setup OBD stuff
-    def setup_OBD(obj):
-        if developermode == 0:
-            global connection
-            global cmd_RPM
-            global cmd_SPEED
-            global cmd_CoolantTemp
-            global cmd_IntakeTemp
-            global cmd_Load
-            global cmd_ThrottlePos
-            global cmd_IntakePressure
-            global OBDconnection
-
-
-            if OBDconnection == 0:
-
-                try:
-                    os.system('sudo rfcomm bind /dev/rfcomm1 00:1D:A5:16:3E:ED')
-                except:
-                    print "OBDII device already connected"
-                try:
-                    connection = obd.OBD() # auto-connects to USB or RF port
-                except:
-                    print "can't connect to OBDII device - make sure it is connected"
-                cmd_RPM = obd.commands.RPM # select RPM OBD command
-                cmd_SPEED = obd.commands.SPEED # select SPEED OBD command
-                cmd_CoolantTemp = obd.commands.COOLANT_TEMP # select CoolantTemp OBD command
-                cmd_IntakeTemp = obd.commands.INTAKE_TEMP # select IntakeTemp OBD command
-                cmd_Load = obd.commands.ENGINE_LOAD # select EngineLoad OBD command
-                cmd_ThrottlePos = obd.commands.THROTTLE_POS  # select Throttle Position OBD command
-                cmd_IntakePressure = obd.commands.INTAKE_PRESSURE  # select Intake Pressure OBD command
-
-    def oilmileageup100(obj):
-        global oilmileage
-        oilmileage = oilmileage+100
-    def oilmileagedown100(obj):
-        global oilmileage
-        oilmileage = oilmileage-100
-    def oilmileageup1k(obj):
-        global oilmileage
-        oilmileage = oilmileage+1000
-    def oilmileagedown1k(obj):
-        global oilmileage
-        oilmileage = oilmileage-1000
-    def oilmileageup10k(obj):
-        global oilmileage
-        oilmileage = oilmileage+10000
-    def oilmileagedown10k(obj):
-        global oilmileage
-        oilmileage = oilmileage-10000
-    def oilmileageup100k(obj):
-        global oilmileage
-        oilmileage = oilmileage+100000
-    def oilmileagedown100k(obj):
-        global oilmileage
-        oilmileage = oilmileage-100000
-
-    def oildatemonthup(obj):
-        global oildatemonth
-        if oildatemonth < 12:
-            oildatemonth = oildatemonth+1
-        else:
-            oildatemonth = 1
-    def oildatemonthdown(obj):
-        global oildatemonth
-        if oildatemonth > 1:
-            oildatemonth = oildatemonth-1
-        else:
-            oildatemonth = 12
-    def oildatedayup(obj):
-        global oildateday
-        if oildateday < 31:
-            oildateday = oildateday+1
-        else:
-            oildateday = 1
-    def oildatedaydown(obj):
-        global oildateday
-        if oildateday > 1:
-            oildateday = oildateday-1
-        else:
-            oildateday = 31
-    def oildateyearup(obj):
-        global oildateyear
-        oildateyear = oildateyear+1
-    def oildateyeardown(obj):
-        global oildateyear
-        oildateyear = oildateyear-1
-    def oilnotifyflip(obj):
-        global oilnotify
-        if oilnotify == 1:
-            oilnotify = 0
-            return
-        if oilnotify == 0:
-            oilnotify = 1
+    # def killaccel(obj):
+    #     global ACCELON
+    #     ACCELON = 0
+    #
+    # def addaccel(obj):
+    #     global ACCELON
+    #     ACCELON = 1
+    #
+    # def resetaccelmaxes(obj):
+    #     global accelxmaxpos
+    #     global accelxmaxneg
+    #     global accelymaxpos
+    #     global accelymaxneg
+    #     accelxmaxpos = 0
+    #     accelxmaxneg = 0
+    #     accelymaxpos = 0
+    #     accelymaxneg = 0
 
 #____________________________________________________________________
 #GPIO CALLBACKS
 def seekup_callback(obj): #logic for seekup gpio
     global SEEKUPON
     if SEEKUPON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(seekupPin, GPIO.LOW)
         SEEKUPON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(seekupPin, GPIO.HIGH)
         SEEKUPON = 0
 
 def seekdown_callback(obj): #logic for seekdown gpio
     global SEEKDOWNON
     if SEEKDOWNON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(seekdownPin, GPIO.LOW)
         SEEKDOWNON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(seekdownPin, GPIO.HIGH)
         SEEKDOWNON = 0
 
 def aux_callback(obj): #logic for aux gpio
     global AUXON
     if AUXON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(auxPin, GPIO.LOW)
         AUXON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(auxPin, GPIO.HIGH)
         AUXON = 0
 
 def amfm_callback(obj): #logic for amfm gpio
     global AMFMON
     if AMFMON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(amfmPin, GPIO.LOW)
         AMFMON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(amfmPin, GPIO.HIGH)
         AMFMON = 0
 
@@ -1912,166 +1173,167 @@ def amfm_callback(obj): #logic for amfm gpio
 def garage_callback(obj): #logic for garage gpio
     global GARAGEON
     if GARAGEON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(garagePin, GPIO.LOW)
         GARAGEON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(garagePin, GPIO.HIGH)
         GARAGEON = 0
 
 def radar_callback(obj): #logic for radar gpio
     global RADARON
     if RADARON == 0:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(radarPin, GPIO.LOW)
         RADARON = 1
     else:
-        if developermode == 0:
+        if is_rpi:
             GPIO.output(radarPin, GPIO.HIGH)
         RADARON = 0
 
-def leds_callback(obj): #logic for cup holder leds gpio
-    global LEDSON
-    if LEDSON == 0:
-        if developermode == 0:
-            GPIO.output(ledsPin, GPIO.HIGH)
-        LEDSON = 1
-    else:
-        if developermode == 0:
-            GPIO.output(ledsPin, GPIO.LOW)
-        LEDSON = 0
 
-def windowsup_callback(obj): #logic for windows up gpio
-    global WINDOWSUPON
-    global WINDOWSDOWNON
-    
-    if WINDOWSDOWNON == 0:
-        
-        if WINDOWSUPON == 0:
-            if developermode == 0:
-                GPIO.output(driverwindowupPin, GPIO.LOW)
-                GPIO.output(passwindowupPin, GPIO.LOW)
-            WINDOWSUPON = 1
-            return
-        if WINDOWSUPON == 1:
-            if developermode == 0:
-                GPIO.output(driverwindowupPin, GPIO.HIGH)
-                GPIO.output(passwindowupPin, GPIO.HIGH)
-            WINDOWSUPON = 0
-            return
-
-        
-def windowsupOFF_callback(obj): #logic to halt the windows
-    global WINDOWSUPON
-    global WINDOWSDOWNON
-    WINDOWSUPON = 0
-    if developermode == 0:
-        GPIO.output(driverwindowupPin, GPIO.HIGH)
-        GPIO.output(passwindowupPin, GPIO.HIGH)
-
-def windowsdown_callback(obj): #logic for windows down gpio
-    global WINDOWSDOWNON
-    global WINDOWSUPON
-    
-    if WINDOWSUPON == 0:
-        
-        if WINDOWSDOWNON == 0:
-            if developermode == 0:
-                GPIO.output(driverwindowdownPin, GPIO.LOW)
-                GPIO.output(passwindowdownPin, GPIO.LOW)
-            WINDOWSDOWNON = 1
-            return
-        if WINDOWSDOWNON == 1:
-            if developermode == 0:
-                GPIO.output(driverwindowdownPin, GPIO.HIGH)
-                GPIO.output(passwindowdownPin, GPIO.HIGH)
-            WINDOWSDOWNON = 0
-            return
-
-def windowsdownOFF_callback(obj): #logic to halt the windows
-    global WINDOWSDOWNON
-    global WINDOWSUPON
-    WINDOWSDOWNON = 0
-    if developermode == 0:
-        GPIO.output(driverwindowdownPin, GPIO.HIGH)
-        GPIO.output(passwindowdownPin, GPIO.HIGH)
-
-    # callback functions for window debugging
-
-def driverup_callback(obj): #logic for driver up gpio
-    global DRIVERUPON
-    if DRIVERUPON == 0:
-        if developermode == 0:
-            GPIO.output(driverwindowupPin, GPIO.LOW)
-        DRIVERUPON = 1
-    else:
-        if developermode == 0:
-            GPIO.output(driverwindowupPin, GPIO.HIGH)
-        DRIVERUPON = 0
-
-def driverstop_callback(obj): #logic for driver window emergency stop
-    global WINDOWSDOWNON
-    global WINDOWSUPON
-    WINDOWSDOWNON = 0
-    WINDOWSUPON = 0
-    if developermode == 0:
-        GPIO.output(driverwindowupPin, GPIO.HIGH)
-        GPIO.output(driverwindowdownPin, GPIO.HIGH)
-
-def driverdown_callback(obj): #logic for driver down gpio
-    global DRIVERDOWNON
-    if DRIVERDOWNON == 0:
-        if developermode == 0:
-            GPIO.output(driverwindowdownPin, GPIO.LOW)
-        DRIVERDOWNON = 1
-    else:
-        if developermode == 0:
-            GPIO.output(driverwindowdownPin, GPIO.HIGH)
-        DRIVERDOWNON = 0
-
-def passengerup_callback(obj): #logic for passenger up gpio
-    global PASSENGERUPON
-    if PASSENGERUPON == 0:
-        if developermode == 0:
-            GPIO.output(passwindowupPin, GPIO.LOW)
-        PASSENGERUPON = 1
-    else:
-        if developermode == 0:
-            GPIO.output(passwindowupPin, GPIO.HIGH)
-        PASSENGERUPON = 0
-
-def passengerstop_callback(obj): #logic for passenger window emergency stop
-    global WINDOWSDOWNON
-    global WINDOWSUPON
-    WINDOWSDOWNON = 0
-    WINDOWSUPON = 0
-    if developermode == 0:
-        GPIO.output(passwindowupPin, GPIO.HIGH)
-        GPIO.output(passwindowdownPin, GPIO.HIGH)
-
-def passengerdown_callback(obj): #logic for passenger down gpio
-    global PASSENGERDOWNON
-    if PASSENGERDOWNON == 0:
-        if developermode == 0:
-            GPIO.output(passwindowdownPin, GPIO.LOW)
-            GPIO.output(passwindowdownPin, GPIO.LOW)
-        PASSENGERDOWNON = 1
-    else:
-        if developermode == 0:
-            GPIO.output(passwindowdownPin, GPIO.HIGH)
-        PASSENGERDOWNON = 0
-
-def allwindowsstop_callback(obj): #logic for all windows emergency stop
-    global WINDOWSDOWNON
-    global WINDOWSUPON
-    WINDOWSDOWNON = 0
-    WINDOWSUPON = 0
-    if developermode == 0:
-        GPIO.output(passwindowupPin, GPIO.HIGH)
-        GPIO.output(passwindowdownPin, GPIO.HIGH)
-        GPIO.output(driverwindowupPin, GPIO.HIGH)
-        GPIO.output(driverwindowdownPin, GPIO.HIGH)
+# def leds_callback(obj): #logic for cup holder leds gpio
+#     global LEDSON
+#     if LEDSON == 0:
+#         if is_rpi:
+#             GPIO.output(ledsPin, GPIO.HIGH)
+#         LEDSON = 1
+#     else:
+#         if is_rpi:
+#             GPIO.output(ledsPin, GPIO.LOW)
+#         LEDSON = 0
+#
+# def windowsup_callback(obj): #logic for windows up gpio
+#     global WINDOWSUPON
+#     global WINDOWSDOWNON
+#
+#     if WINDOWSDOWNON == 0:
+#
+#         if WINDOWSUPON == 0:
+#             if is_rpi:
+#                 GPIO.output(driverwindowupPin, GPIO.LOW)
+#                 GPIO.output(passwindowupPin, GPIO.LOW)
+#             WINDOWSUPON = 1
+#             return
+#         if WINDOWSUPON == 1:
+#             if is_rpi:
+#                 GPIO.output(driverwindowupPin, GPIO.HIGH)
+#                 GPIO.output(passwindowupPin, GPIO.HIGH)
+#             WINDOWSUPON = 0
+#             return
+#
+#
+# def windowsupOFF_callback(obj): #logic to halt the windows
+#     global WINDOWSUPON
+#     global WINDOWSDOWNON
+#     WINDOWSUPON = 0
+#     if is_rpi:
+#         GPIO.output(driverwindowupPin, GPIO.HIGH)
+#         GPIO.output(passwindowupPin, GPIO.HIGH)
+#
+# def windowsdown_callback(obj): #logic for windows down gpio
+#     global WINDOWSDOWNON
+#     global WINDOWSUPON
+#
+#     if WINDOWSUPON == 0:
+#
+#         if WINDOWSDOWNON == 0:
+#             if is_rpi:
+#                 GPIO.output(driverwindowdownPin, GPIO.LOW)
+#                 GPIO.output(passwindowdownPin, GPIO.LOW)
+#             WINDOWSDOWNON = 1
+#             return
+#         if WINDOWSDOWNON == 1:
+#             if is_rpi:
+#                 GPIO.output(driverwindowdownPin, GPIO.HIGH)
+#                 GPIO.output(passwindowdownPin, GPIO.HIGH)
+#             WINDOWSDOWNON = 0
+#             return
+#
+# def windowsdownOFF_callback(obj): #logic to halt the windows
+#     global WINDOWSDOWNON
+#     global WINDOWSUPON
+#     WINDOWSDOWNON = 0
+#     if is_rpi:
+#         GPIO.output(driverwindowdownPin, GPIO.HIGH)
+#         GPIO.output(passwindowdownPin, GPIO.HIGH)
+#
+#     # callback functions for window debugging
+#
+# def driverup_callback(obj): #logic for driver up gpio
+#     global DRIVERUPON
+#     if DRIVERUPON == 0:
+#         if is_rpi:
+#             GPIO.output(driverwindowupPin, GPIO.LOW)
+#         DRIVERUPON = 1
+#     else:
+#         if is_rpi:
+#             GPIO.output(driverwindowupPin, GPIO.HIGH)
+#         DRIVERUPON = 0
+#
+# def driverstop_callback(obj): #logic for driver window emergency stop
+#     global WINDOWSDOWNON
+#     global WINDOWSUPON
+#     WINDOWSDOWNON = 0
+#     WINDOWSUPON = 0
+#     if is_rpi:
+#         GPIO.output(driverwindowupPin, GPIO.HIGH)
+#         GPIO.output(driverwindowdownPin, GPIO.HIGH)
+#
+# def driverdown_callback(obj): #logic for driver down gpio
+#     global DRIVERDOWNON
+#     if DRIVERDOWNON == 0:
+#         if is_rpi:
+#             GPIO.output(driverwindowdownPin, GPIO.LOW)
+#         DRIVERDOWNON = 1
+#     else:
+#         if is_rpi:
+#             GPIO.output(driverwindowdownPin, GPIO.HIGH)
+#         DRIVERDOWNON = 0
+#
+# def passengerup_callback(obj): #logic for passenger up gpio
+#     global PASSENGERUPON
+#     if PASSENGERUPON == 0:
+#         if is_rpi:
+#             GPIO.output(passwindowupPin, GPIO.LOW)
+#         PASSENGERUPON = 1
+#     else:
+#         if is_rpi:
+#             GPIO.output(passwindowupPin, GPIO.HIGH)
+#         PASSENGERUPON = 0
+#
+# def passengerstop_callback(obj): #logic for passenger window emergency stop
+#     global WINDOWSDOWNON
+#     global WINDOWSUPON
+#     WINDOWSDOWNON = 0
+#     WINDOWSUPON = 0
+#     if is_rpi:
+#         GPIO.output(passwindowupPin, GPIO.HIGH)
+#         GPIO.output(passwindowdownPin, GPIO.HIGH)
+#
+# def passengerdown_callback(obj): #logic for passenger down gpio
+#     global PASSENGERDOWNON
+#     if PASSENGERDOWNON == 0:
+#         if is_rpi:
+#             GPIO.output(passwindowdownPin, GPIO.LOW)
+#             GPIO.output(passwindowdownPin, GPIO.LOW)
+#         PASSENGERDOWNON = 1
+#     else:
+#         if is_rpi:
+#             GPIO.output(passwindowdownPin, GPIO.HIGH)
+#         PASSENGERDOWNON = 0
+#
+# def allwindowsstop_callback(obj): #logic for all windows emergency stop
+#     global WINDOWSDOWNON
+#     global WINDOWSUPON
+#     WINDOWSDOWNON = 0
+#     WINDOWSUPON = 0
+#     if is_rpi:
+#         GPIO.output(passwindowupPin, GPIO.HIGH)
+#         GPIO.output(passwindowdownPin, GPIO.HIGH)
+#         GPIO.output(driverwindowupPin, GPIO.HIGH)
+#         GPIO.output(driverwindowdownPin, GPIO.HIGH)
 
 if __name__ =='__main__':
     MainApp().run()
