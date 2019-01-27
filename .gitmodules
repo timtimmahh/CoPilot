@@ -1,0 +1,3 @@
+[submodule "include/igomezal/openauto"]
+	path = include/igomezal/openauto
+	url = git@github.com:igomezal/openauto.git
