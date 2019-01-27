@@ -1,3 +1,6 @@
 [submodule "include/igomezal/openauto"]
 	path = include/igomezal/openauto
 	url = git@github.com:igomezal/openauto.git
+[submodule "include/f1xpl/aasdk"]
+	path = include/f1xpl/aasdk
+	url = git@github.com:f1xpl/aasdk.git

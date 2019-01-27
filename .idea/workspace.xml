@@ -1,19 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="8bafbc36-2b8b-447b-9edc-fa4122511962" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/settings.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/CoPilot.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CoPilot.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="8bafbc36-2b8b-447b-9edc-fa4122511962" name="Default" comment="Added openauto submodule.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kivymd/button.py" beforeDir="false" afterPath="$PROJECT_DIR$/kivymd/button.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kivymd/progressbar.py" beforeDir="false" afterPath="$PROJECT_DIR$/kivymd/progressbar.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kivymd/tabs.py" beforeDir="false" afterPath="$PROJECT_DIR$/kivymd/tabs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.kv" beforeDir="false" afterPath="$PROJECT_DIR$/main.kv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mapview/view.py" beforeDir="false" afterPath="$PROJECT_DIR$/mapview/view.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/savedata.txt" beforeDir="false" afterPath="$PROJECT_DIR$/savedata.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pipfile" beforeDir="false" afterPath="$PROJECT_DIR$/Pipfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pipfile.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Pipfile.lock" afterDir="false" />
     </list>
     <ignored path="CoPilot.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -52,8 +43,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="28470">
-              <caret line="1139" column="42" selection-start-line="1139" selection-start-column="42" selection-end-line="1139" selection-end-column="42" />
+            <state relative-caret-position="208">
+              <caret line="74" column="42" selection-start-line="74" selection-start-column="42" selection-end-line="74" selection-end-column="42" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
               </folding>
@@ -62,10 +53,19 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/Pipfile">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="338">
+              <caret line="13" column="81" selection-start-line="13" selection-start-column="81" selection-end-line="13" selection-end-column="81" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/settings.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2054">
-              <caret line="81" column="22" selection-start-line="81" selection-start-column="19" selection-end-line="81" selection-end-column="22" />
+            <state relative-caret-position="157">
+              <caret line="78" selection-start-line="78" selection-end-line="78" />
             </state>
           </provider>
         </entry>
@@ -79,11 +79,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/main.kv">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="556">
-              <caret line="4424" column="83" lean-forward="true" selection-start-line="4424" selection-start-column="83" selection-end-line="4424" selection-end-column="83" />
+            <state relative-caret-position="107">
+              <caret line="4421" column="28" selection-start-line="4421" selection-start-column="28" selection-end-line="4421" selection-end-column="28" />
             </state>
           </provider>
         </entry>
@@ -151,9 +151,15 @@
     </replaceStrings>
   </component>
   <component name="Git.Settings">
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <list>
+        <option value="Timothy Logan &lt;timtimmahh@gmail.com&gt;" />
+      </list>
+    </option>
     <option name="PUSH_AUTO_UPDATE" value="true" />
     <option name="ROOT_SYNC" value="DONT_SYNC" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="SIGN_OFF_COMMIT" value="true" />
     <option name="PREVIEW_PUSH_PROTECTED_ONLY" value="true" />
   </component>
   <component name="HighlightingSettingsPerFile">
@@ -166,7 +172,6 @@
         <option value="$PROJECT_DIR$/kivymd/button.py" />
         <option value="$PROJECT_DIR$/mapview/view.py" />
         <option value="$PROJECT_DIR$/kivymd/progressbar.py" />
-        <option value="$PROJECT_DIR$/Pipfile" />
         <option value="$PROJECT_DIR$/config.ini" />
         <option value="$PROJECT_DIR$/savedata.txt" />
         <option value="$PROJECT_DIR$/settings.py" />
@@ -174,6 +179,7 @@
         <option value="$PROJECT_DIR$/utils.py" />
         <option value="$PROJECT_DIR$/main.py" />
         <option value="$PROJECT_DIR$/main.kv" />
+        <option value="$PROJECT_DIR$/Pipfile" />
       </list>
     </option>
   </component>
@@ -205,7 +211,7 @@
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$USER_HOME$/Clones/kivy" />
-    <property name="settings.editor.selected.configurable" value="settings.github" />
+    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
     <property name="settings.editor.splitter.proportion" value="0.22239383" />
   </component>
   <component name="PyCoverageOptionsProvider">
@@ -321,6 +327,14 @@
       <workItem from="1548517730754" duration="37725000" />
       <workItem from="1548558853910" duration="365000" />
     </task>
+    <task id="LOCAL-00001" summary="Added openauto submodule.">
+      <created>1548561178362</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1548561178362</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -329,10 +343,11 @@
     </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="106575000" />
+    <option name="totallyTimeSpent" value="108191000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="27" width="1920" height="1053" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.1383547" />
       <window_info id="Structure" order="1" weight="0.25" />
@@ -369,18 +384,11 @@
       <collection />
     </option>
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Added openauto submodule." />
+    <option name="LAST_COMMIT_MESSAGE" value="Added openauto submodule." />
+  </component>
   <component name="editorHistoryManager">
-    <entry file="file://$USER_HOME$/.local/lib/python3.7/site-packages/kivy/uix/behaviors/button.py" />
-    <entry file="file://$USER_HOME$/.PyCharm2018.3/system/python_stubs/-990920199/builtins.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="792">
-          <caret line="5275" column="8" selection-start-line="5275" selection-start-column="8" selection-end-line="5275" selection-end-column="8" />
-          <folding>
-            <element signature="e#176026#176655#1" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/.local/share/virtualenvs/CoPilot-AQw09-ld/lib/python3.7/site-packages/kivy/uix/progressbar.py" />
     <entry file="file://$USER_HOME$/.PyCharm2018.3/system/python_stubs/-1003818763/kivy/properties.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -624,13 +632,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Pipfile">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="477">
-          <caret line="19" selection-start-line="19" selection-end-line="19" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/kivymd/progressbar.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="26">
@@ -700,23 +701,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/main.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="28470">
-          <caret line="1139" column="42" selection-start-line="1139" selection-start-column="42" selection-end-line="1139" selection-end-column="42" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/settings.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2054">
-          <caret line="81" column="22" selection-start-line="81" selection-start-column="19" selection-end-line="81" selection-end-column="22" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/config.ini">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="416">
@@ -736,8 +720,42 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/main.kv">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="556">
-          <caret line="4424" column="83" lean-forward="true" selection-start-line="4424" selection-start-column="83" selection-end-line="4424" selection-end-column="83" />
+        <state relative-caret-position="107">
+          <caret line="4421" column="28" selection-start-line="4421" selection-start-column="28" selection-end-line="4421" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="208">
+          <caret line="74" column="42" selection-start-line="74" selection-start-column="42" selection-end-line="74" selection-end-column="42" />
+          <folding>
+            <element signature="e#0#10#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/include/igomezal/openauto/cmake_modules/Findlibusb-1.0.cmake">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Pipfile">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="338">
+          <caret line="13" column="81" selection-start-line="13" selection-start-column="81" selection-end-line="13" selection-end-column="81" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/include/igomezal/openauto/src/autoapp/autoapp.cpp">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="286">
+          <caret line="11" column="55" lean-forward="true" selection-start-line="11" selection-start-column="55" selection-end-line="11" selection-end-column="55" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="157">
+          <caret line="78" selection-start-line="78" selection-end-line="78" />
         </state>
       </provider>
     </entry>

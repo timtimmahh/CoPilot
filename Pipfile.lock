@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "ec018090cd0404c8f8ac1782b9342cd1b5f5cb6276c9a88ad304bce0a2e10629"
+            "sha256": "6ef93f19801374272fc7fbb05abfedd74c27846032a5cf301c736d56ba448ffe"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -160,14 +160,6 @@
             ],
             "index": "pypi",
             "version": "==0.7.2"
-        },
-        "plumbum": {
-            "hashes": [
-                "sha256:d143f079bfb60b11e9bec09a49695ce2e55ce5ca0246877bdb0818ab7c7fc312",
-                "sha256:df96a5facf621db4a6d682bdc93afa5ed6b107a8667c73c3f0a0f0fab4217c81"
-            ],
-            "index": "pypi",
-            "version": "==1.6.7"
         },
         "plyer": {
             "editable": true,
